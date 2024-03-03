@@ -1,0 +1,56 @@
+#include <Wire.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BMP280.h>
+#include <BLEDevice.h>
+#include <BLEUtils.h>
+#include <BLEServer.h>
+
+// Define BLE service and characteristic UUIDs
+#define SERVICE_UUID "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
+#define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
+
+// Define Bluetooth characteristics
+BLEServer* pServer;
+BLEService* pService;
+BLECharacteristic* pCharacteristic;
+
+// Define sensor objects
+Adafruit_BMP280 bmp;
+
+void setup() {
+  Serial.begin(115200);
+
+  // Initialize BMP280 sensor
+  if (!bmp.begin()) {
+    Serial.println("Could not find BMP280 sensor, check wiring!");
+    while (1);
+  }
+
+  // Initialize BLE
+  BLEDevice::init("Medical Monitoring Device");
+  pServer = BLEDevice::createServer();
+  pService = pServer->createService(SERVICE_UUID);
+  pCharacteristic = pService->createCharacteristic(
+                      CHARACTERISTIC_UUID,
+                      BLECharacteristic::PROPERTY_READ |
+                      BLECharacteristic::PROPERTY_NOTIFY
+                    );
+  pService->start();
+  pServer->getAdvertising()->start();
+}
+
+void loop() {
+  // Read sensor data
+  float temperature = bmp.readTemperature();
+  float pressure = bmp.readPressure() / 100.0; // Convert Pa to hPa
+
+  // Format sensor data
+  String data = String("Temperature: ") + temperature + " C\n" +
+                String("Pressure: ") + pressure + " hPa";
+
+  // Update BLE characteristic with sensor data
+  pCharacteristic->setValue(data.c_str());
+  pCharacteristic->notify();
+
+  delay(1000); // Adjust delay time as needed
+}
